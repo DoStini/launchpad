@@ -17,6 +17,20 @@ def gray_scale(img: cv2.Mat) -> cv2.Mat:
 def find_circles_positions(img: cv2.Mat):
     return cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 5, param1=15, param2=35, minRadius=5, maxRadius=20)
 
+def find_circle_color(img, x, y, r):
+    roi = img[y - r: y + r, x - r: x + r]
+    width, height = roi.shape[:2]
+    mask = np.zeros((width, height, 3), roi.dtype)
+    cv2.circle(mask, (int(width / 2), int(height / 2)), r, (255, 255, 255), -1)
+
+    area = cv2.bitwise_and(roi, mask)
+    data = []
+    for i in range(3):
+        channel = area[:, :, i]
+        indices = np.where(channel != 0)[0]
+        color = np.mean(channel[indices])
+        data.append(int(color))
+    return tuple(data)
 
 while True:
     _, img = cam.read()
@@ -28,9 +42,11 @@ while True:
     if circles is not None:
         circles = np.uint16(np.around(circles))
         for [pos_x, pos_y, radius] in circles[0,:]:
-            cv2.circle(gray_img, (pos_x, pos_y), radius, (0, 0, 0), thickness=cv2.FILLED)
+            color = find_circle_color(img, pos_x, pos_y, radius)
+            cv2.circle(img, (pos_x, pos_y), radius, color, thickness=cv2.FILLED)
+            cv2.circle(img, (pos_x, pos_y), radius, (0,0,0), thickness=2)
 
-    cv2.imshow(NAME, gray_img)
+    cv2.imshow(NAME, img)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
