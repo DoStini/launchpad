@@ -1,5 +1,7 @@
 import cv2
 import numpy as np
+import matplotlib.pyplot as plt
+from scipy import stats
 
 NAME = "LaunchPa$"
 CAM_IDX = 2
@@ -13,7 +15,7 @@ def gray_scale(img: cv2.Mat) -> cv2.Mat:
     return cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
 def find_circles_positions(img: cv2.Mat):
-    return cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 5, param1=20, param2=40, minRadius=5, maxRadius=50)
+    return cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 5, param1=15, param2=35, minRadius=5, maxRadius=20)
 
 
 while True:
@@ -22,7 +24,7 @@ while True:
     gray_img = gray_scale(img)
     # gray_img = cv2.medianBlur(gray_img, 5)
     circles = find_circles_positions(gray_img)
-
+    
     if circles is not None:
         circles = np.uint16(np.around(circles))
         for [pos_x, pos_y, radius] in circles[0,:]:
