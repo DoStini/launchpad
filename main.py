@@ -5,21 +5,26 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 
-NAME = "LaunchPa$"
-CAM_IDX = 0
+BOARD_NAME = "LaunchPa$ Board"
+CONTROLS_NAME = "LaunchPa$ Controls"
+BOARD_CAM_IDX = 1
+CONTROLS_CAM_IDX = 3
 
 # def detect_circles():
 
 COLOR_DIST_TRESHOLD = 30
 COLOR_DETECTION_TIMEOUT = 3
-NUM_COLORS = 8
+NUM_COLORS = 7
 
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_50)
 aruco_params = cv2.aruco.DetectorParameters()
 aruco_detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 
-cam = cv2.VideoCapture(CAM_IDX)
-cv2.namedWindow(NAME)
+board_cam = cv2.VideoCapture(BOARD_CAM_IDX)
+cv2.namedWindow(BOARD_NAME)
+
+controls_cam = cv2.VideoCapture(CONTROLS_CAM_IDX)
+cv2.namedWindow(CONTROLS_NAME)
 
 def distance_3d(p1, p2):
     (r1,g1,b1) = p1
@@ -57,7 +62,7 @@ def point_outside_bounds(bounds: list[tuple[int]], point: tuple[int]) -> bool:
     return cv2.pointPolygonTest(bounds, point, measureDist=False) < 0
 
 def find_circles_positions(img: cv2.Mat):
-    return cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 5, param1=15, param2=35, minRadius=5, maxRadius=20)
+    return cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 5, param1=30, param2=70, minRadius=50, maxRadius=60)
 
 def find_circle_color(img, x, y, r) -> tuple:
     roi = img[y - r: y + r, x - r: x + r]
@@ -96,8 +101,8 @@ def find_closest_color(color):
 
 initial_time = time.time()
 
-while True:
-    _, img = cam.read()
+def run_board():
+    _, img = board_cam.read()
 
     gray_img = gray_scale(img)
     # gray_img = cv2.medianBlur(gray_img, 5)
@@ -136,12 +141,17 @@ while True:
             cv2.rectangle(img, bounding_box[0], bounding_box[1], (0,0,0), thickness=2)
             cv2.putText(img, str(btn.id), org=(pos_x, pos_y), fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(0,0,0), thickness=1)
 
-    cv2.imshow(NAME, img)
+    img = cv2.resize(img, (960, 540))
+    cv2.imshow(BOARD_NAME, img)
+
+while True:
+    run_board()
+
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 
-cam.release()
+board_cam.release()
 cv2.destroyAllWindows()
 
