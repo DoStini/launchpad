@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 NAME = "LaunchPa$"
-CAM_IDX = 2
+CAM_IDX = 0
 
 # def detect_circles():
 
@@ -136,7 +136,7 @@ while True:
             cv2.rectangle(img, bounding_box[0], bounding_box[1], (0,0,0), thickness=2)
             cv2.putText(img, str(btn.id), org=(pos_x, pos_y), fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(0,0,0), thickness=1)
 
-    cv2.imshow(NAME, gray_img)
+    cv2.imshow(NAME, img)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
