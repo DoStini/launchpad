@@ -1,3 +1,17 @@
+from enum import Enum
+import mediapipe as mp
+from mediapipe import solutions
+from mediapipe.framework.formats import landmark_pb2
+import numpy as np
+from Hand import Hand
+from HandTrackingModule import HandDetector
+
+BaseOptions = mp.tasks.BaseOptions
+HandLandmarker = mp.tasks.vision.HandLandmarker
+HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
+VisionRunningMode = mp.tasks.vision.RunningMode
+
+
 import math
 import time
 import cv2
@@ -6,9 +20,20 @@ import matplotlib.pyplot as plt
 from scipy import stats
 
 BOARD_NAME = "LaunchPa$ Board"
-CONTROLS_NAME = "LaunchPa$ Controls"
+HEIGHT_NAME = "LaunchPa$ Height"
+HEIGHT_CLICK_VALUE = 180
+
 BOARD_CAM_IDX = 1
-CONTROLS_CAM_IDX = 3
+HEIGHT_CAM_IDX = 2
+
+class ClickState(Enum):
+    IDLE = 1
+    CLICKED = 2
+    DOWN = 3
+
+click_state = ClickState.IDLE
+
+detector = HandDetector(detectionCon=0.85, maxHands=2)
 
 # def detect_circles():
 
@@ -23,8 +48,10 @@ aruco_detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 board_cam = cv2.VideoCapture(BOARD_CAM_IDX)
 cv2.namedWindow(BOARD_NAME)
 
-controls_cam = cv2.VideoCapture(CONTROLS_CAM_IDX)
-cv2.namedWindow(CONTROLS_NAME)
+height_cam = cv2.VideoCapture(HEIGHT_CAM_IDX)
+cv2.namedWindow(HEIGHT_NAME)
+
+
 
 def distance_3d(p1, p2):
     (r1,g1,b1) = p1
@@ -58,6 +85,11 @@ def detect_bounds(gray_img) -> list[tuple[int]]:
 
     return result
 
+def point_inside_bounding_box(box, pos):
+    [(x1, y1), (x2, y2)] = box
+    x, y = pos
+    return x > x1 and x < x2 and y > y1 and y < y2
+
 def point_outside_bounds(bounds: list[tuple[int]], point: tuple[int]) -> bool:
     return cv2.pointPolygonTest(bounds, point, measureDist=False) < 0
 
@@ -80,12 +112,19 @@ def find_circle_color(img, x, y, r) -> tuple:
     return tuple(data)
 
 class Button:
-    def __init__(self, color: tuple, position: tuple, id: int) -> None:
+    def __init__(self, color: tuple, position: tuple, bounding_box: tuple, id: int) -> None:
         self.color: tuple = color
         self.position: tuple = position
+        self.bounding_box: tuple = bounding_box
         self.id: int = id
 
-buttons = {}
+buttons: dict[tuple[int], Button] = {}
+
+def find_button(pos):
+    for button in buttons.values():
+        if not point_inside_bounding_box(button.bounding_box, pos):
+            continue
+        return button
 
 def find_closest_color(color):
     if len(buttons) == 0:
@@ -101,8 +140,21 @@ def find_closest_color(color):
 
 initial_time = time.time()
 
-def run_board():
-    _, img = board_cam.read()
+def click_position(hands: list[Hand]):
+    for hand in hands:
+        return hand.index_tip_position
+
+def run_board(img):
+    global click_state
+
+    hands = find_hands(img)
+
+    clicked_btn = None
+
+    if click_state == ClickState.CLICKED:
+        pos = click_position(hands)
+        if pos is not None:
+            clicked_btn = find_button(pos)
 
     gray_img = gray_scale(img)
     # gray_img = cv2.medianBlur(gray_img, 5)
@@ -132,26 +184,73 @@ def run_board():
             similar_color = find_closest_color(color)
 
             if similar_color is None:
-                btn = Button(color, (pos_x, pos_y), len(buttons))
+                btn = Button(color, (pos_x, pos_y), bounding_box, len(buttons))
                 buttons[color] = btn
             else:
                 btn = buttons[similar_color]
                 btn.position = (pos_x, pos_y)
-            cv2.rectangle(img, bounding_box[0], bounding_box[1], color, thickness=cv2.FILLED)
-            cv2.rectangle(img, bounding_box[0], bounding_box[1], (0,0,0), thickness=2)
-            cv2.putText(img, str(btn.id), org=(pos_x, pos_y), fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(0,0,0), thickness=1)
+                btn.bounding_box = bounding_box
+
+
+        for button in buttons.values():
+            border_color = (256, 256, 256) if button == clicked_btn else (0,0,0)
+            cv2.rectangle(img, button.bounding_box[0], button.bounding_box[1], button.color, thickness=cv2.FILLED)
+            cv2.rectangle(img, button.bounding_box[0], button.bounding_box[1], border_color , thickness=5)
+            cv2.putText(img, str(button.id), org=button.position, fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(0,0,0), thickness=1)
 
     img = cv2.resize(img, (960, 540))
     cv2.imshow(BOARD_NAME, img)
 
-while True:
-    run_board()
 
+def find_hands(img: cv2.Mat) -> list[Hand]:
+    hands = []
+    img = detector.find_hands(img, img, draw=False)
+    landmarks = detector.find_positions(img, draw=False)
+    hand_fingers = detector.fingers_up()
+    for idx, landmarks in enumerate(landmarks):
+        hand = Hand(landmarks, hand_fingers[idx])
+        hands.append(hand)
+        cv2.circle(img, hand.index_tip_position, 10, (200,0, 0), cv2.FILLED)
+
+    return hands
+
+def run_height(img):
+    width, height = img.shape[:2]
+
+    hands = find_hands(img)
+    update_click_status(hands)
+
+    cv2.line(img, (0, HEIGHT_CLICK_VALUE), (width, HEIGHT_CLICK_VALUE), (0,200,0), 4)
+
+    cv2.imshow(HEIGHT_NAME, img)
+
+def update_click_status(hands: list[Hand]):
+    global click_state
+
+    for hand in hands:
+        if hand.index_tip_position[1] > HEIGHT_CLICK_VALUE:
+            if click_state == ClickState.IDLE:
+                click_state = ClickState.CLICKED
+        elif click_state == ClickState.DOWN:
+            click_state = ClickState.IDLE
+
+
+while True:
+    _, height_img = height_cam.read()
+    _, board_img = board_cam.read()
+
+
+    run_height(height_img)
+    run_board(board_img)
+
+    if click_state == ClickState.CLICKED:
+        click_state = ClickState.DOWN
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
 
 board_cam.release()
+height_cam.release()
 cv2.destroyAllWindows()
 
