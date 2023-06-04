@@ -1,4 +1,6 @@
 from enum import Enum
+import json
+import os
 import mediapipe as mp
 from mediapipe import solutions
 from mediapipe.framework.formats import landmark_pb2
@@ -23,6 +25,27 @@ import mido
 midi_port = mido.open_output("Fluidsynth GM")
 
 
+PARAM1 = 1
+PARAM2 = 1
+MIN_RADIUS = 1
+MAX_RADIUS = 1
+
+def load_config():
+    global PARAM1, PARAM2, MIN_RADIUS, MAX_RADIUS
+    if not os.path.exists("config/latest.json"):
+        print("ERROR: Create configuration file using config.py")
+        exit(1)
+
+    with open("config/latest.json", "r") as openfile:
+        json_object = json.load(openfile)
+        PARAM1 = json_object["param1"]
+        PARAM2 = json_object["param2"]
+        MIN_RADIUS = json_object["min_radius"]
+        MAX_RADIUS = json_object["max_radius"]
+
+
+load_config()
+
 BOARD_NAME = "LaunchPa$ Board"
 HEIGHT_NAME = "LaunchPa$ Height"
 HEIGHT_CLICK_VALUE = 180
@@ -31,8 +54,6 @@ BOARD_CAM_IDX = 1
 HEIGHT_CAM_IDX = 2
 
 detector = HandDetector(detectionCon=0.85, maxHands=2)
-
-# def detect_circles():
 
 COLOR_DIST_TRESHOLD = 30
 COLOR_DETECTION_TIMEOUT = 3
@@ -91,7 +112,7 @@ def point_outside_bounds(bounds: list[tuple[int]], point: tuple[int]) -> bool:
     return cv2.pointPolygonTest(bounds, point, measureDist=False) < 0
 
 def find_circles_positions(img: cv2.Mat):
-    return cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 5, param1=30, param2=70, minRadius=50, maxRadius=60)
+    return cv2.HoughCircles(img, cv2.HOUGH_GRADIENT, 1, 5, param1=PARAM1, param2=PARAM2, minRadius=MIN_RADIUS, maxRadius=MAX_RADIUS)
 
 def find_circle_color(img, x, y, r) -> tuple:
     roi = img[y - r: y + r, x - r: x + r]
@@ -160,7 +181,6 @@ def find_closest_color(color):
         return target
 
     return None
-
 
 initial_time = time.time()
 

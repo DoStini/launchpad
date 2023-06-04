@@ -16,8 +16,6 @@ MAX_RADIUS = 60
 
 NAME = "LaunchPa$"
 CAM_IDX = 1
-# TODO Interactive slider to change values and wirte config file
-# def detect_circles():
 
 cam = cv2.VideoCapture(CAM_IDX)
 cv2.namedWindow(NAME)
