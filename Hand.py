@@ -1,3 +1,5 @@
+from enum import Enum
+import numpy as np
 from typing import ClassVar
 
 FingerPosition = int
@@ -5,6 +7,10 @@ FingerPosition = int
 UP = 0
 DOWN = 1
 
+class ClickState(Enum):
+    IDLE = 1
+    CLICKED = 2
+    DOWN = 3
 
 class Hand:
     THUMB: ClassVar[FingerPosition] = 0
@@ -18,8 +24,14 @@ class Hand:
     ) -> None:
         self.parse_positions(finger_positions)
         self.fingers_up = fingers_up
+        self.click_state = ClickState.IDLE
 
     def parse_positions(self, positions, offset_ratio=(0, 0)):
+
+        self.wrist_position = (
+            positions[0][1],
+            positions[0][2],
+        )
 
         # tipIDs=[4,8,12,16,20] #Finger tip IDs
         self.finger_positions = [
@@ -52,6 +64,24 @@ class Hand:
         self.all_positions = positions
         self.offset_ratio = offset_ratio
 
+    def update_positions(self, positions, fingers_up, offset=(1, 1)):
+        self.parse_positions(positions, offset)
+        self.fingers_up = fingers_up
+
+    def update_click_status(self):
+        if self.click_fingers_active():
+            if self.click_state == ClickState.IDLE:
+                self.click_state = ClickState.CLICKED
+        elif self.click_state == ClickState.DOWN:
+            self.click_state = ClickState.IDLE
+
+    def consume_click(self):
+        self.click_state = ClickState.DOWN
+
+    @property
+    def clicked(self):
+        return self.click_state == ClickState.CLICKED
+
     @property
     def thumb_tip_position(self):
         return self.finger_positions[Hand.THUMB]
@@ -71,6 +101,24 @@ class Hand:
     @property
     def pinky_tip_position(self):
         return self.finger_positions[Hand.PINKY]
+
+    def finger_up(self, finger: FingerPosition):
+        return self.finger(finger) == UP
+
+    def finger_down(self, finger: FingerPosition):
+        return self.finger(finger) == DOWN
+
+    def click_fingers_active(self):
+        return (
+            self.finger_down(Hand.INDEX)
+            and self.finger_down(Hand.MIDDLE)
+            and self.finger_down(Hand.RING)
+            and self.finger_down(Hand.PINKY)
+        )
+
+    @property
+    def position(self):
+        return self.index_tip_position
 
     def finger(self, finger: FingerPosition):
         return self.fingers_up[finger]

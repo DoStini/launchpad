@@ -30,13 +30,6 @@ HEIGHT_CLICK_VALUE = 180
 BOARD_CAM_IDX = 1
 HEIGHT_CAM_IDX = 2
 
-class ClickState(Enum):
-    IDLE = 1
-    CLICKED = 2
-    DOWN = 3
-
-click_state = ClickState.IDLE
-
 detector = HandDetector(detectionCon=0.85, maxHands=2)
 
 # def detect_circles():
@@ -124,6 +117,33 @@ class Button:
 
 buttons: dict[tuple[int], Button] = {}
 
+def merge_hands(previous_hands: list[Hand], landmarks, fingers_up):
+    new_list = []
+    for idx, landmark in enumerate(landmarks):
+        match = None
+        best_dist = 10000
+        for hand in previous_hands:
+            dist = math.dist(
+                (
+                    int(landmark[0][1]),
+                    int(landmark[0][2]),
+                ),
+                (hand.wrist_position[0], hand.wrist_position[1]),
+            )
+            # if dist > 50:
+            #     continue
+            if dist < best_dist:
+                match = hand
+                best_dist = dist
+
+        if match:
+            match.update_positions(landmark, fingers_up[idx])
+        else:
+            match = Hand(landmark, fingers_up[idx])
+
+        new_list.append(match)
+    return new_list
+
 def find_button(pos):
     for button in buttons.values():
         if not point_inside_bounding_box(button.bounding_box, pos):
@@ -148,23 +168,24 @@ def click_position(hands: list[Hand]):
     for hand in hands:
         return hand.index_tip_position
 
-def run_board(img):
+def run_board(img, hands: list[Hand]):
     global click_state
-
-    hands = find_hands(img)
 
     clicked_btn = None
 
-    if click_state == ClickState.CLICKED:
-        pos = click_position(hands)
-        if pos is not None:
-            clicked_btn = find_button(pos)
-            if clicked_btn is not None:
-                msg = mido.Message('note_on', note=clicked_btn.id + 50)
-                midi_port.send(msg)
+    for hand in hands:
+        if not hand.clicked:
+            continue
+        
+        clicked_btn = find_button(hand.position)
+        if clicked_btn is None:
+            continue
 
-                click_state = ClickState.DOWN
+        msg = mido.Message('note_on', note=clicked_btn.id + 50)
+        midi_port.send(msg)
 
+        hand.consume_click()
+        
 
     gray_img = gray_scale(img)
     # gray_img = cv2.medianBlur(gray_img, 5)
@@ -212,46 +233,32 @@ def run_board(img):
     cv2.imshow(BOARD_NAME, img)
 
 
-def find_hands(img: cv2.Mat) -> list[Hand]:
-    hands = []
-    img = detector.find_hands(img, img, draw=False)
-    landmarks = detector.find_positions(img, draw=False)
-    hand_fingers = detector.fingers_up()
-    for idx, landmarks in enumerate(landmarks):
-        hand = Hand(landmarks, hand_fingers[idx])
-        hands.append(hand)
-        cv2.circle(img, hand.index_tip_position, 10, (200,0, 0), cv2.FILLED)
-
-    return hands
-
-def run_height(img):
-    width, height = img.shape[:2]
-
-    hands = find_hands(img)
-    update_click_status(hands)
-
-    cv2.line(img, (0, HEIGHT_CLICK_VALUE), (width, HEIGHT_CLICK_VALUE), (0,200,0), 4)
-
-    cv2.imshow(HEIGHT_NAME, img)
-
 def update_click_status(hands: list[Hand]):
-    global click_state
-
     for hand in hands:
-        if hand.index_tip_position[1] > HEIGHT_CLICK_VALUE:
-            if click_state == ClickState.IDLE:
-                click_state = ClickState.CLICKED
-        elif click_state == ClickState.DOWN:
-            click_state = ClickState.IDLE
+        hand.update_click_status()
+
+def draw_hands(img, hands: list[Hand]):
+    for hand in hands:
+        cv2.circle(img, hand.position, 10, (200,0, 0), cv2.FILLED)
+
+hands_list: list[Hand] = []
 
 
 while True:
-    _, height_img = height_cam.read()
+    # _, height_img = height_cam.read()
     _, board_img = board_cam.read()
 
+    detector.find_hands(board_img, board_img, draw=False)
+    landmarks = detector.find_positions(board_img, draw=False)
+    hand_fingers = detector.fingers_up()
 
-    run_height(height_img)
-    run_board(board_img)
+    hands_list = merge_hands(hands_list, landmarks, hand_fingers)
+    update_click_status(hands_list)
+
+    draw_hands(board_img, hands_list)
+
+    # run_height(height_img)
+    run_board(board_img, hands_list)
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
