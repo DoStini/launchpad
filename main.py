@@ -18,6 +18,10 @@ import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
+import mido
+
+midi_port = mido.open_output("Fluidsynth GM")
+
 
 BOARD_NAME = "LaunchPa$ Board"
 HEIGHT_NAME = "LaunchPa$ Height"
@@ -155,6 +159,12 @@ def run_board(img):
         pos = click_position(hands)
         if pos is not None:
             clicked_btn = find_button(pos)
+            if clicked_btn is not None:
+                msg = mido.Message('note_on', note=clicked_btn.id + 50)
+                midi_port.send(msg)
+
+                click_state = ClickState.DOWN
+
 
     gray_img = gray_scale(img)
     # gray_img = cv2.medianBlur(gray_img, 5)
@@ -242,9 +252,6 @@ while True:
 
     run_height(height_img)
     run_board(board_img)
-
-    if click_state == ClickState.CLICKED:
-        click_state = ClickState.DOWN
 
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
