@@ -5,14 +5,20 @@ import mediapipe as mp
 from mediapipe import solutions
 from mediapipe.framework.formats import landmark_pb2
 import numpy as np
+from Button import Button
 from Hand import Hand
 from HandTrackingModule import HandDetector
+from looper import Looper
+import sounds
 
 BaseOptions = mp.tasks.BaseOptions
 HandLandmarker = mp.tasks.vision.HandLandmarker
 HandLandmarkerOptions = mp.tasks.vision.HandLandmarkerOptions
 VisionRunningMode = mp.tasks.vision.RunningMode
 
+
+SOUNDS = [None] * 5
+KEY = ""
 
 import math
 import time
@@ -65,9 +71,6 @@ aruco_detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 
 board_cam = cv2.VideoCapture(BOARD_CAM_IDX)
 cv2.namedWindow(BOARD_NAME)
-
-height_cam = cv2.VideoCapture(HEIGHT_CAM_IDX)
-cv2.namedWindow(HEIGHT_NAME)
 
 
 
@@ -128,13 +131,6 @@ def find_circle_color(img, x, y, r) -> tuple:
         color = np.mean(channel[indices])
         data.append(int(color))
     return tuple(data)
-
-class Button:
-    def __init__(self, color: tuple, position: tuple, bounding_box: tuple, id: int) -> None:
-        self.color: tuple = color
-        self.position: tuple = position
-        self.bounding_box: tuple = bounding_box
-        self.id: int = id
 
 buttons: dict[tuple[int], Button] = {}
 
@@ -201,11 +197,14 @@ def run_board(img, hands: list[Hand]):
         if clicked_btn is None:
             continue
 
-        msg = mido.Message('note_on', note=clicked_btn.id + 50)
-        midi_port.send(msg)
+        # msg = mido.Message('note_on', note=clicked_btn.id + 50, channel = 3)
+        # midi_port.send(msg)
+
+        if clicked_btn.id < 5:
+            looper.toggle(SOUNDS[clicked_btn.id])
 
         hand.consume_click()
-        
+
 
     gray_img = gray_scale(img)
     # gray_img = cv2.medianBlur(gray_img, 5)
@@ -247,7 +246,7 @@ def run_board(img, hands: list[Hand]):
             border_color = (256, 256, 256) if button == clicked_btn else (0,0,0)
             cv2.rectangle(img, button.bounding_box[0], button.bounding_box[1], button.color, thickness=cv2.FILLED)
             cv2.rectangle(img, button.bounding_box[0], button.bounding_box[1], border_color , thickness=5)
-            cv2.putText(img, str(button.id), org=button.position, fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(0,0,0), thickness=1)
+            cv2.putText(img, str(button.id), org=button.position, fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(255,255,255), thickness=1)
 
     img = cv2.resize(img, (960, 540))
     cv2.imshow(BOARD_NAME, img)
@@ -262,10 +261,24 @@ def draw_hands(img, hands: list[Hand]):
         cv2.circle(img, hand.position, 10, (200,0, 0), cv2.FILLED)
 
 hands_list: list[Hand] = []
+looper = Looper()
 
+
+def update_sounds(key, sound1, sound2, sound3, sound4, sound5):
+    global SOUNDS, KEY
+
+    paths = map(lambda x: f"samples/{key}/{x}", [sound1, sound2, sound3, sound4, sound5])
+
+    KEY = key
+    SOUNDS = list(paths)
+
+    for sound in SOUNDS:
+        looper.set_sound(sound)
+    print(SOUNDS)
+
+sounds.init(update_sounds)
 
 while True:
-    # _, height_img = height_cam.read()
     _, board_img = board_cam.read()
 
     detector.find_hands(board_img, board_img, draw=False)
@@ -285,6 +298,5 @@ while True:
 
 
 board_cam.release()
-height_cam.release()
 cv2.destroyAllWindows()
 
