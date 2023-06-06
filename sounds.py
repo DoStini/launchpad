@@ -3,6 +3,7 @@ import threading
 import tkinter as tk
 from tkinter import ttk
 from glob import glob
+import generator
 
 from Button import Button
 
@@ -32,6 +33,7 @@ def gui(callback):
     sound_4_val = tk.StringVar(value=SOUND4)
     sound_5_val = tk.StringVar(value=SOUND5)
     key_val = tk.StringVar(value=KEY)
+    random_instrument_val = tk.StringVar(value="")
 
 
     def close():
@@ -47,6 +49,7 @@ def gui(callback):
         SOUND3 = sound_3_val.get()
         SOUND4 = sound_4_val.get()
         SOUND5 = sound_5_val.get()
+        generator.set_random_instrument(random_instrument_val.get())
 
     ttk.Label(frm, text="Key").grid(column=0, row=0)
     key = tk.OptionMenu(frm, key_val, KEY, *KEYS)
@@ -71,9 +74,20 @@ def gui(callback):
     ttk.Label(frm, text="Sound 4").grid(column=0, row=5)
     sound_5 = tk.OptionMenu(frm, sound_5_val, SOUND5, *SOUNDS)
     sound_5.grid(column=1, row=5)
+
+
+    ttk.Label(frm, text="Sound 5 Instrument").grid(column=0, row=6)
+    markov_instrument = tk.OptionMenu(frm, random_instrument_val, "", *generator.INSTRUMENTS.keys())
+    markov_instrument.grid(column=1, row=6)
+
+    ttk.Label(frm, text="Sound 6 Instrument").grid(column=0, row=7)
+    random_instrument = tk.OptionMenu(frm, random_instrument_val, "", *generator.INSTRUMENTS.keys())
+    random_instrument.grid(column=1, row=7)
+
+    
     
     def reset_menus():
-        global sound_1, sound_2, sound_3, sound_4, sound_5
+        global sound_1, sound_2, sound_3, sound_4, sound_5, markov_instrument, random_instrument
 
         sound_1.destroy()
         sound_2.destroy()
@@ -92,6 +106,14 @@ def gui(callback):
         sound_5 = tk.OptionMenu(frm, sound_5_val, SOUND5, *SOUNDS)
         sound_5.grid(column=1, row=5)
 
+        ttk.Label(frm, text="Sound 5 Instrument").grid(column=0, row=6)
+        markov_instrument = tk.OptionMenu(frm, random_instrument_val, "", *generator.INSTRUMENTS.keys())
+        markov_instrument.grid(column=1, row=6)
+
+        ttk.Label(frm, text="Sound 6 Instrument").grid(column=0, row=7)
+        random_instrument = tk.OptionMenu(frm, random_instrument_val, "", *generator.INSTRUMENTS.keys())
+        random_instrument.grid(column=1, row=7)
+
     def change_keys(_1, _2, _3):
         global KEY, SOUNDS
         KEY = key_val.get()
@@ -104,10 +126,12 @@ def gui(callback):
     sound_3_val.trace("w", on_change)
     sound_4_val.trace("w", on_change)
     sound_5_val.trace("w", on_change)
+    random_instrument_val.trace("w", on_change)
+    # random_instrument_val.trace("w", on_change)
 
 
-    tk.Button(frm, text='Save configuration', command=lambda: callback(KEY, SOUND1, SOUND2, SOUND3, SOUND4, SOUND5)).grid(column=0,row=6)
-    tk.Button(frm, text='Quit', command=close).grid(column=0,row=7)
+    tk.Button(frm, text='Save configuration', command=lambda: callback(KEY, SOUND1, SOUND2, SOUND3, SOUND4, SOUND5)).grid(column=0,row=12)
+    tk.Button(frm, text='Quit', command=close).grid(column=0,row=13)
 
     root.mainloop()
 
