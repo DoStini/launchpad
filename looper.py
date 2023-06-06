@@ -2,10 +2,17 @@ from multiprocessing import Event
 from threading import Thread
 from pygame import mixer, init
 
+from generator import RandomGenerator
+
 init()
 mixer.init()
 
 mixer.set_num_channels(20)
+
+random_gen_queued: RandomGenerator = None
+random_gen: RandomGenerator = None
+random_gen_removed_queued = False
+random_stop_flag: Event = None
 
 queue = []
 remove_queue_sound = []
@@ -30,6 +37,7 @@ class TimerDeque(Thread):
         while not self.stopped.wait(self.time):
             self.looper.release_queue()
             self.looper.release_remove_queue()
+
             bar = (bar % 4) + 1
 
 class Looper:
@@ -43,6 +51,15 @@ class Looper:
         self.stopTimer = Event()
         thread = TimerDeque(60 / bpm * 4, self.stopTimer, self)
         thread.start()
+
+    def toggle_random_generator(self):
+        global random_gen_queued, random_gen_removed_queued, random_stop_flag
+        if random_gen != None:
+            random_gen_removed_queued = True
+            return False
+        random_stop_flag = Event()
+        random_gen_queued = RandomGenerator(random_stop_flag)
+        return True
 
     def set_sound(self, sound: str):
         sounds[sound] = mixer.Sound(sound)
@@ -58,6 +75,8 @@ class Looper:
         return True
 
     def release_remove_queue(self):
+        global random_gen_removed_queued, random_gen, random_stop_flag
+
         for channel in remove_queue_channel:
             channel.fadeout(500)
         for sound in remove_queue_sound:
@@ -65,14 +84,27 @@ class Looper:
         
         remove_queue_sound.clear()
         remove_queue_channel.clear()
+        if random_gen_removed_queued:
+            random_gen_removed_queued = False
+            random_stop_flag.set()
+            random_gen = None
+            
 
     def release_queue(self):
+        global random_gen, random_gen_queued
+
         for sound in queue:
             channel = mixer.find_channel()
             loops[sound] = channel
             snd = sounds[sound]
             channel.play(snd, loops=-1, fade_ms=500)
         queue.clear()
+
+        if random_gen_queued is not None:
+            random_gen = random_gen_queued
+            
+            random_gen.start()
+            random_gen_queued = None
 
 loooper = Looper()
 loooper.set_bpm(120)

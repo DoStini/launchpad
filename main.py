@@ -10,6 +10,7 @@ from Hand import Hand
 from HandTrackingModule import HandDetector
 import looper
 import sounds
+import generator
 
 BaseOptions = mp.tasks.BaseOptions
 HandLandmarker = mp.tasks.vision.HandLandmarker
@@ -27,8 +28,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy import stats
 import mido
-
-midi_port = mido.open_output("Fluidsynth GM")
 
 
 PARAM1 = 1
@@ -202,6 +201,8 @@ def run_board(img, hands: list[Hand]):
 
         if clicked_btn.id < 5:
             clicked_btn.active = mix_looper.toggle(SOUNDS[clicked_btn.id])
+        elif clicked_btn.id == 6:
+            clicked_btn.active = mix_looper.toggle_random_generator()
 
         hand.consume_click()
 

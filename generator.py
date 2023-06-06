@@ -1,4 +1,5 @@
 import random
+import threading
 import time
 from mido import MidiFile, open_output, Message
 from fluidsynth import Synth
@@ -12,17 +13,12 @@ fs.start(driver="pulseaudio")
 FONT = "/usr/share/soundfonts/airfont_320_neo.sf2"
 
 id = fs.sfload(FONT)
-fs.program_select(0, id, 0, 33)
-fs.program_select(1, id, 0, 1)
+fs.program_select(0, id, 0, 1)
 
-duration_times = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
-duration_probs = [0.5, 0.2, 0.1, 0.05, 0.05, 0.05, 0.03, 0.02]
+random_playing = False
 
 # mid: MidiFile = MidiFile("midis/fuguecm.mid")
 mid = MidiFile("midis/Dm/diamond.mid")
-mid.play()
-input("")
-print(mid.ticks_per_beat)
 
 def markov():
     notes = list(map(lambda msg: msg.note, filter(lambda msg: msg.type == "note_on", mid)))
@@ -105,30 +101,68 @@ def markov():
 
 
 
-def random_in_scale():
-    MAX_STEP = 3
+duration_times = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+duration_probs = [0.5, 0.2, 0.1, 0.05, 0.05, 0.05, 0.03, 0.02]
 
-    possible_notes = musical_scales.scale("D", "pentatonic minor", 2)
+class RandomGenerator(threading.Thread):
+    def __init__(self, event):
+        threading.Thread.__init__(self)
+        self.stopped = event
 
-    note_idx = int(len(possible_notes) / 2)
-    note = 0
-    for x in range(100):
-        time.sleep(np.random.choice(duration_times, p=duration_probs))
-        fs.noteoff(1, note)
-        note = utils.note_to_midi(possible_notes[note_idx].midi)
-        print(note)
-        fs.noteon(1, note, 60)
+        self.MAX_STEP = 3
+        self.possible_notes = musical_scales.scale("D", "pentatonic minor", 2)
 
-        new_note_idx = note_idx + random.randint(-MAX_STEP, MAX_STEP)
+    def run(self):
+        note_idx = int(len(self.possible_notes) / 2)
+        note = 0
 
-        if new_note_idx >= len(possible_notes):
-            note_idx = len(possible_notes) - (new_note_idx % len(possible_notes)) - 1
-        elif new_note_idx < 0:
-            note_idx = -new_note_idx
-        else:
-            note_idx = new_note_idx
+        while not self.stopped.wait(np.random.choice(duration_times, p=duration_probs)):
+            fs.noteoff(0, note)
+            note = utils.note_to_midi(self.possible_notes[note_idx].midi)
+            print(note)
+            fs.noteon(0, note, 60)
+
+            new_note_idx = note_idx + random.randint(-self.MAX_STEP, self.MAX_STEP)
+
+            if new_note_idx >= len(self.possible_notes):
+                note_idx = len(self.possible_notes) - (new_note_idx % len(self.possible_notes)) - 1
+            elif new_note_idx < 0:
+                note_idx = -new_note_idx
+            else:
+                note_idx = new_note_idx
+        fs.all_notes_off(0)
+
+# class RandomGenerator(threading.Thread):
+#     def play(self):
+#         global random_playing
+
+#         MAX_STEP = 3
+#         random_playing = True
+#         possible_notes = musical_scales.scale("D", "pentatonic minor", 2)
+
+#         note_idx = int(len(possible_notes) / 2)
+#         note = 0
+#         while random_playing:
+#             time.sleep(np.random.choice(duration_times, p=duration_probs))
+#             fs.noteoff(0, note)
+#             note = utils.note_to_midi(possible_notes[note_idx].midi)
+#             print(note)
+#             fs.noteon(0, note, 60)
+
+#             new_note_idx = note_idx + random.randint(-MAX_STEP, MAX_STEP)
+
+#             if new_note_idx >= len(possible_notes):
+#                 note_idx = len(possible_notes) - (new_note_idx % len(possible_notes)) - 1
+#             elif new_note_idx < 0:
+#                 note_idx = -new_note_idx
+#             else:
+#                 note_idx = new_note_idx
+
+#     def stop(self):
+#         global random_playing
+#         random_playing = False
+#         fs.all_notes_off(0)
 
 # mid.play()
 
 # input("")
-random_in_scale()
