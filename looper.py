@@ -30,7 +30,7 @@ class TimerDeque(Thread):
         while not self.stopped.wait(self.time):
             self.looper.release_queue()
             self.looper.release_remove_queue()
-            bar += 1
+            bar = (bar % 4) + 1
 
 class Looper:
     def __init__(self) -> None:
