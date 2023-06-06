@@ -15,6 +15,9 @@ id = fs.sfload(FONT)
 fs.program_select(0, id, 0, 33)
 fs.program_select(1, id, 0, 1)
 
+duration_times = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+duration_probs = [0.5, 0.2, 0.1, 0.05, 0.05, 0.05, 0.03, 0.02]
+
 # mid: MidiFile = MidiFile("midis/fuguecm.mid")
 mid = MidiFile("midis/Dm/diamond.mid")
 mid.play()
@@ -23,24 +26,6 @@ print(mid.ticks_per_beat)
 
 def markov():
     notes = list(map(lambda msg: msg.note, filter(lambda msg: msg.type == "note_on", mid)))
-    # note_msgs = list(filter(lambda msg: msg.type == "note_on" or msg.type == "note_off", mid))
-
-
-    # for note_idx, note in note_msgs:
-    #     duration = 0
-
-    #     if not
-
-    #     for idx, off in enumerate(note_off_msgs):
-    #         duration += note.time
-    #         if note.note == off.note:
-    #             durations.append(duration)
-    #             break
-    #     del note_off_msgs[idx]
-
-
-    # print(note_off_msgs)
-    # print(durations)
 
     transitions = {}
 
@@ -95,7 +80,7 @@ def markov():
     note = list(probabilities.keys())[0]
 
     for idx in range(100):
-        time.sleep(0.25)
+        time.sleep(np.random.choice(duration_times, p=duration_probs))
         fs.noteoff(0, note)
 
         prev = note
@@ -123,19 +108,27 @@ def markov():
 def random_in_scale():
     MAX_STEP = 3
 
-    possible_notes = musical_scales.scale("D", "harmonic minor", 2)
+    possible_notes = musical_scales.scale("D", "pentatonic minor", 2)
 
     note_idx = int(len(possible_notes) / 2)
-
+    note = 0
     for x in range(100):
-        time.sleep(0.25)
+        time.sleep(np.random.choice(duration_times, p=duration_probs))
+        fs.noteoff(1, note)
         note = utils.note_to_midi(possible_notes[note_idx].midi)
         print(note)
-        fs.noteon(0, note, 60)
+        fs.noteon(1, note, 60)
 
-        note_idx =  (note_idx + random.randint(-MAX_STEP, MAX_STEP)) % len(possible_notes)
+        new_note_idx = note_idx + random.randint(-MAX_STEP, MAX_STEP)
+
+        if new_note_idx >= len(possible_notes):
+            note_idx = len(possible_notes) - (new_note_idx % len(possible_notes)) - 1
+        elif new_note_idx < 0:
+            note_idx = -new_note_idx
+        else:
+            note_idx = new_note_idx
 
 # mid.play()
 
 # input("")
-markov()
+random_in_scale()
