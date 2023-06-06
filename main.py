@@ -201,8 +201,10 @@ def run_board(img, hands: list[Hand]):
 
         if clicked_btn.id < 5:
             clicked_btn.active = mix_looper.toggle(SOUNDS[clicked_btn.id])
-        elif clicked_btn.id == 6:
+        elif clicked_btn.id == 5:
             clicked_btn.active = mix_looper.toggle_random_generator()
+        elif clicked_btn.id == 6:
+            clicked_btn.active = mix_looper.toggle_markov_generator()
 
         hand.consume_click()
 

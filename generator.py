@@ -103,39 +103,11 @@ INSTRUMENTS = {
     "Pad 6 (metallic)": 93,
     "Pad 7 (halo)": 94,
     "Pad 8 (sweep)": 95,
-    "FX 1 (rain)": 96,
-    "FX 2 (soundtrack)": 97,
-    "FX 3 (crystal)": 98,
-    "FX 4 (atmosphere)": 99,
-    "FX 5 (brightness)": 100,
-    "FX 6 (goblins)": 101,
-    "FX 7 (echoes)": 102,
-    "FX 8 (sci-fi)": 103,
-    "Sitar": 104,
-    "Banjo": 105,
-    "Shamisen": 106,
-    "Koto": 107,
-    "Kalimba": 108,
-    "Bagpipe": 109,
-    "Fiddle": 110,
-    "Shana": 111,
-    "Tinkle Bell": 112,
-    "Agogo": 113,
-    "Steel Drums": 114,
-    "Woodblock": 115,
-    "Taiko Drum": 116,
-    "Melodic Tom": 117,
-    "Synth Drum": 118,
-    "Reverse Cymbal": 119,
-    "Guitar Fret Noise": 120,
-    "Breath Noise": 121,
-    "Seashore": 122,
-    "Bird Tweet": 123,
-    "Telephone Ring": 124,
-    "Helicopter": 125,
-    "Applause": 126,
-    "Gunshot": 127
 }
+
+
+duration_times = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
+duration_probs = [0.5, 0.2, 0.1, 0.05, 0.05, 0.05, 0.03, 0.02]
 
 fs = Synth()
 fs.start(driver="pulseaudio")
@@ -144,98 +116,92 @@ FONT = "/usr/share/soundfonts/airfont_320_neo.sf2"
 
 id = fs.sfload(FONT)
 fs.program_select(0, id, 0, 1)
+fs.program_select(1, id, 0, 1)
 
 def set_random_instrument(instrument_value):
     fs.program_select(0, id, 0, INSTRUMENTS[instrument_value])
+
+def set_markov_instrument(instrument_value):
+    fs.program_select(1, id, 0, INSTRUMENTS[instrument_value])
 
 random_playing = False
 
 # mid: MidiFile = MidiFile("midis/fuguecm.mid")
 mid = MidiFile("midis/Dm/diamond.mid")
 
-def markov():
-    notes = list(map(lambda msg: msg.note, filter(lambda msg: msg.type == "note_on", mid)))
-
-    transitions = {}
-
-    for x in range(len(notes) - 1):
-        note = notes[x]
-        current = transitions.get(note, {})
-
-        after = notes[x+1]
-        count = current.get(after, 0)
-
-        current[after] = count + 1
-
-        transitions[note] = current
-
-    probabilities = {}
-
-    for note, note_transitions in transitions.items():
-        cnt = sum(note_transitions.values())
-        notes = []
-        probs = []
-        for next_note, num in note_transitions.items():
-            notes.append(next_note)
-            probs.append(num / cnt)
-
-        probabilities[note] = {
-            "notes": notes,
-            "probabilities": probs
-        }
 
 
+class MarkovGenerator(threading.Thread):
+    def __init__(self, event):
+        threading.Thread.__init__(self)
+        self.stopped = event
+        self.repeated = 0
+        self.MAX_REPEATED = 4
 
-    # events = list(mid)
+        notes = list(map(lambda msg: msg.note, filter(lambda msg: msg.type == "note_on", mid)))
+        self.notes = notes
 
-    # midi_port.send(Message(type="program_change", channel=5, program=40, time=0))
 
-    # # for event in events:
-    # #     print
+        transitions = {}
 
-    # print(events)
+        for x in range(len(notes) - 1):
+            note = notes[x]
+            current = transitions.get(note, {})
 
-    def predict_next_note(probabilities, note):
+            after = notes[x+1]
+            count = current.get(after, 0)
+
+            current[after] = count + 1
+
+            transitions[note] = current
+
+        probabilities = {}
+
+        for note, note_transitions in transitions.items():
+            cnt = sum(note_transitions.values())
+            notes = []
+            probs = []
+            for next_note, num in note_transitions.items():
+                notes.append(next_note)
+                probs.append(num / cnt)
+
+            probabilities[note] = {
+                "notes": notes,
+                "probabilities": probs
+            }
+
+        self.probabilities = probabilities
+
+    def predict_next_note(self, probabilities, note):
         transition = probabilities[note]
         return np.random.choice(transition["notes"], 1, p = transition["probabilities"])[0]
 
+    def run(self):
+        note = list(self.probabilities.keys())[0]
 
-    NUM_NOTES = 200
-    MAX_REPEATED = 4
+        while not self.stopped.wait(np.random.choice(duration_times, p=duration_probs)):
+            fs.noteoff(1, note)
 
+            prev = note
+            note = self.predict_next_note(self.probabilities, note)
+            print(note)
 
-    repeated = 0
+            if prev == note:
+                self.repeated += 1
+            else:
+                self.repeated = 0
 
-    note = list(probabilities.keys())[0]
+            if self.repeated == self.MAX_REPEATED:
+                while True:
+                    new = self.predict_next_note(self.probabilities, note)
+                    if new != note:
+                        note = new
+                        break
+                self.repeated = 0
 
-    for idx in range(100):
-        time.sleep(np.random.choice(duration_times, p=duration_probs))
-        fs.noteoff(0, note)
+            # print(msg)
+            fs.noteon(1, note - 5, 120)
 
-        prev = note
-        note = predict_next_note(probabilities, note)
-
-        if prev == note:
-            repeated += 1
-        else:
-            repeated = 0
-
-        if repeated == MAX_REPEATED:
-            while True:
-                new = predict_next_note(probabilities, note)
-                if new != note:
-                    note = new
-                    break
-            repeated = 0
-
-        # print(msg)
-        fs.noteon(0, note, 60)
-        # fs.noteon(0, msg.note - 12, msg.velocity)
-
-
-
-duration_times = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
-duration_probs = [0.5, 0.2, 0.1, 0.05, 0.05, 0.05, 0.03, 0.02]
 
 class RandomGenerator(threading.Thread):
     def __init__(self, event):

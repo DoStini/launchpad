@@ -2,7 +2,7 @@ from multiprocessing import Event
 from threading import Thread
 from pygame import mixer, init
 
-from generator import RandomGenerator
+from generator import RandomGenerator, MarkovGenerator
 
 init()
 mixer.init()
@@ -13,6 +13,11 @@ random_gen_queued: RandomGenerator = None
 random_gen: RandomGenerator = None
 random_gen_removed_queued = False
 random_stop_flag: Event = None
+
+markov_gen_queued: MarkovGenerator = None
+markov_gen: MarkovGenerator = None
+markov_gen_removed_queued = False
+markov_stop_flag: Event = None
 
 queue = []
 remove_queue_sound = []
@@ -61,6 +66,15 @@ class Looper:
         random_gen_queued = RandomGenerator(random_stop_flag)
         return True
 
+    def toggle_markov_generator(self):
+        global markov_gen_queued, markov_gen_removed_queued, markov_stop_flag
+        if markov_gen != None:
+            markov_gen_removed_queued = True
+            return False
+        markov_stop_flag = Event()
+        markov_gen_queued = MarkovGenerator(markov_stop_flag)
+        return True
+
     def set_sound(self, sound: str):
         sounds[sound] = mixer.Sound(sound)
 
@@ -75,7 +89,7 @@ class Looper:
         return True
 
     def release_remove_queue(self):
-        global random_gen_removed_queued, random_gen, random_stop_flag
+        global random_gen_removed_queued, random_gen, random_stop_flag, markov_gen_removed_queued, markov_gen, markov_stop_flag
 
         for channel in remove_queue_channel:
             channel.fadeout(500)
@@ -89,10 +103,14 @@ class Looper:
             random_gen_removed_queued = False
             random_stop_flag.set()
             random_gen = None
+        if markov_gen_removed_queued:
+            markov_gen_removed_queued = False
+            markov_stop_flag.set()
+            markov_gen = None
             
 
     def release_queue(self):
-        global random_gen, random_gen_queued
+        global random_gen, random_gen_queued, markov_gen, markov_gen_queued
 
         for sound in queue:
             channel = mixer.find_channel()
@@ -106,6 +124,12 @@ class Looper:
             
             random_gen.start()
             random_gen_queued = None
+
+        if markov_gen_queued is not None:
+            markov_gen = markov_gen_queued
+            
+            markov_gen.start()
+            markov_gen_queued = None
 
 loooper = Looper()
 loooper.set_bpm(120)
