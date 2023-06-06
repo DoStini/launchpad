@@ -8,7 +8,7 @@ import numpy as np
 from Button import Button
 from Hand import Hand
 from HandTrackingModule import HandDetector
-from looper import Looper
+import looper
 import sounds
 
 BaseOptions = mp.tasks.BaseOptions
@@ -201,7 +201,7 @@ def run_board(img, hands: list[Hand]):
         # midi_port.send(msg)
 
         if clicked_btn.id < 5:
-            looper.toggle(SOUNDS[clicked_btn.id])
+            clicked_btn.active = mix_looper.toggle(SOUNDS[clicked_btn.id])
 
         hand.consume_click()
 
@@ -243,7 +243,7 @@ def run_board(img, hands: list[Hand]):
 
 
         for button in buttons.values():
-            border_color = (256, 256, 256) if button == clicked_btn else (0,0,0)
+            border_color = (256, 256, 256) if button.active else (0,0,0)
             cv2.rectangle(img, button.bounding_box[0], button.bounding_box[1], button.color, thickness=cv2.FILLED)
             cv2.rectangle(img, button.bounding_box[0], button.bounding_box[1], border_color , thickness=5)
             cv2.putText(img, str(button.id), org=button.position, fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=1, color=(255,255,255), thickness=1)
@@ -261,7 +261,7 @@ def draw_hands(img, hands: list[Hand]):
         cv2.circle(img, hand.position, 10, (200,0, 0), cv2.FILLED)
 
 hands_list: list[Hand] = []
-looper = Looper()
+mix_looper = looper.Looper()
 
 
 def update_sounds(key, sound1, sound2, sound3, sound4, sound5):
@@ -273,7 +273,7 @@ def update_sounds(key, sound1, sound2, sound3, sound4, sound5):
     SOUNDS = list(paths)
 
     for sound in SOUNDS:
-        looper.set_sound(sound)
+        mix_looper.set_sound(sound)
     print(SOUNDS)
 
 sounds.init(update_sounds)
@@ -289,6 +289,8 @@ while True:
     update_click_status(hands_list)
 
     draw_hands(board_img, hands_list)
+
+    cv2.putText(board_img, f"Bar: {looper.bar}", org=(10,50), fontFace=cv2.FONT_HERSHEY_DUPLEX, fontScale=2, thickness=1, color=(0,255,0))
 
     # run_height(height_img)
     run_board(board_img, hands_list)
