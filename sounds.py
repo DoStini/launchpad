@@ -33,7 +33,11 @@ def gui(callback):
     sound_4_val = tk.StringVar(value=SOUND4)
     sound_5_val = tk.StringVar(value=SOUND5)
     key_val = tk.StringVar(value=KEY)
-    random_instrument_val = tk.StringVar(value="")
+    random_instrument_val = tk.StringVar(value="Acoustic Grand Piano")
+    markov_instrument_val = tk.StringVar(value="Acoustic Grand Piano")
+
+    random_instrument_octaver_val = tk.IntVar(value=0)
+    markov_instrument_octaver_val = tk.IntVar(value=0)
 
 
     def close():
@@ -50,6 +54,9 @@ def gui(callback):
         SOUND4 = sound_4_val.get()
         SOUND5 = sound_5_val.get()
         generator.set_random_instrument(random_instrument_val.get())
+        generator.set_markov_instrument(markov_instrument_val.get())
+        generator.random_octaver = random_instrument_octaver_val.get()
+        generator.markov_octaver = markov_instrument_octaver_val.get()
 
     ttk.Label(frm, text="Key").grid(column=0, row=0)
     key = tk.OptionMenu(frm, key_val, KEY, *KEYS)
@@ -75,14 +82,13 @@ def gui(callback):
     sound_5 = tk.OptionMenu(frm, sound_5_val, SOUND5, *SOUNDS)
     sound_5.grid(column=1, row=5)
 
-
-    ttk.Label(frm, text="Sound 5 Instrument").grid(column=0, row=6)
-    markov_instrument = tk.OptionMenu(frm, random_instrument_val, "", *generator.INSTRUMENTS.keys())
-    markov_instrument.grid(column=1, row=6)
-
-    ttk.Label(frm, text="Sound 6 Instrument").grid(column=0, row=7)
+    ttk.Label(frm, text="Random Instrument").grid(column=0, row=6)
     random_instrument = tk.OptionMenu(frm, random_instrument_val, "", *generator.INSTRUMENTS.keys())
-    random_instrument.grid(column=1, row=7)
+    random_instrument.grid(column=1, row=6)
+
+    ttk.Label(frm, text="Markov Instrument").grid(column=0, row=7)
+    markov_instrument = tk.OptionMenu(frm, markov_instrument_val, "", *generator.INSTRUMENTS.keys())
+    markov_instrument.grid(column=1, row=7)
 
     
     
@@ -95,6 +101,7 @@ def gui(callback):
         sound_4.destroy()
         sound_5.destroy()
 
+    
         sound_1 = tk.OptionMenu(frm, sound_1_val, SOUND1, *SOUNDS)
         sound_1.grid(column=1, row=1)
         sound_2 = tk.OptionMenu(frm, sound_2_val, SOUND2, *SOUNDS)
@@ -106,13 +113,13 @@ def gui(callback):
         sound_5 = tk.OptionMenu(frm, sound_5_val, SOUND5, *SOUNDS)
         sound_5.grid(column=1, row=5)
 
-        ttk.Label(frm, text="Sound 5 Instrument").grid(column=0, row=6)
-        markov_instrument = tk.OptionMenu(frm, random_instrument_val, "", *generator.INSTRUMENTS.keys())
-        markov_instrument.grid(column=1, row=6)
+    ttk.Label(frm, text="Sound 5 Octaves").grid(column=2, row=6)
+    random_instrument_octaver = tk.OptionMenu(frm, random_instrument_octaver_val, 0, *[-2,-1,0,1,2])
+    random_instrument_octaver.grid(column=3, row=6)
 
-        ttk.Label(frm, text="Sound 6 Instrument").grid(column=0, row=7)
-        random_instrument = tk.OptionMenu(frm, random_instrument_val, "", *generator.INSTRUMENTS.keys())
-        random_instrument.grid(column=1, row=7)
+    ttk.Label(frm, text="Sound 6 Octaves").grid(column=2, row=7)
+    markov_instrument_octaver = tk.OptionMenu(frm, markov_instrument_octaver_val, 0, *[-2,-1,0,1,2])
+    markov_instrument_octaver.grid(column=3, row=7)
 
     def change_keys(_1, _2, _3):
         global KEY, SOUNDS
@@ -127,7 +134,9 @@ def gui(callback):
     sound_4_val.trace("w", on_change)
     sound_5_val.trace("w", on_change)
     random_instrument_val.trace("w", on_change)
-    # random_instrument_val.trace("w", on_change)
+    markov_instrument_val.trace("w", on_change)
+    random_instrument_octaver_val.trace("w", on_change)
+    markov_instrument_octaver_val.trace("w", on_change)
 
 
     tk.Button(frm, text='Save configuration', command=lambda: callback(KEY, SOUND1, SOUND2, SOUND3, SOUND4, SOUND5)).grid(column=0,row=12)

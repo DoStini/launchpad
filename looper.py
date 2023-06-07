@@ -94,7 +94,7 @@ class Looper:
         for channel in remove_queue_channel:
             channel.fadeout(500)
         for sound in remove_queue_sound:
-            if loops[sound] is not None:
+            if sound in loops:
                 del loops[sound]
         
         remove_queue_sound.clear()

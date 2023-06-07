@@ -109,6 +109,9 @@ INSTRUMENTS = {
 duration_times = [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0]
 duration_probs = [0.5, 0.2, 0.1, 0.05, 0.05, 0.05, 0.03, 0.02]
 
+random_octaver = 0
+markov_octaver = 0
+
 fs = Synth()
 fs.start(driver="pulseaudio")
 
@@ -180,11 +183,11 @@ class MarkovGenerator(threading.Thread):
         note = list(self.probabilities.keys())[0]
 
         while not self.stopped.wait(np.random.choice(duration_times, p=duration_probs)):
-            fs.noteoff(1, note)
+
+            fs.noteoff(1, note - 5 + 12 * markov_octaver)
 
             prev = note
             note = self.predict_next_note(self.probabilities, note)
-            print(note)
 
             if prev == note:
                 self.repeated += 1
@@ -200,7 +203,7 @@ class MarkovGenerator(threading.Thread):
                 self.repeated = 0
 
             # print(msg)
-            fs.noteon(1, note - 5, 120)
+            fs.noteon(1, note - 5 + 12 * markov_octaver, 120)
 
 
 class RandomGenerator(threading.Thread):
@@ -216,10 +219,10 @@ class RandomGenerator(threading.Thread):
         note = 0
 
         while not self.stopped.wait(np.random.choice(duration_times, p=duration_probs)):
-            fs.noteoff(0, note)
+            fs.noteoff(0, note + random_octaver * 12)
             note = utils.note_to_midi(self.possible_notes[note_idx].midi)
-            print(note)
-            fs.noteon(0, note, 120)
+
+            fs.noteon(0, note + random_octaver * 12, 120)
 
             new_note_idx = note_idx + random.randint(-self.MAX_STEP, self.MAX_STEP)
 
